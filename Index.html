@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Germ Tapper - Level Progression</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #2b0000; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+        }
+        canvas { 
+            background-color: #ff8080; 
+            border: 8px solid #cc0000; 
+            border-radius: 40px; 
+            box-shadow: inset 0 0 50px #990000; 
+            touch-action: none; 
+        }
+        #uiBoard { 
+            position: absolute; 
+            top: 20px; 
+            width: 760px; /* Match canvas width roughly */
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Comic Sans MS', sans-serif; 
+            font-size: 30px; 
+            color: white; 
+            font-weight: bold; 
+            text-shadow: 2px 2px 4px #000; 
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="uiBoard">
+        <div>Level: <span id="levelDisplay">1</span></div>
+        <div>Zapped: <span id="scoreDisplay">0</span></div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game State Variables
+        let score = 0;
+        let level = 1;
+        let baseSpeed = 1.5;
+        let germsSpawnedThisLevel = 0;
+        const GERMS_PER_LEVEL = 25;
+        const MAX_SPEED = 5.0;
+        let gameWon = false;
+        
+        let germs = [];
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (gameWon) {
+                // Victory Screen
+                ctx.fillStyle = "white";
+                ctx.font = "bold 50px 'Comic Sans MS'";
+                ctx.textAlign = "center";
+                ctx.fillText("Stomach Clean!", canvas.width / 2, canvas.height / 2 - 20);
+                ctx.font = "bold 30px 'Comic Sans MS'";
+                ctx.fillText(`Final Score: ${score}`, canvas.width / 2, canvas.height / 2 + 30);
+                return; // Stop the game loop
+            }
+
+            // Spawn Logic: Only spawn if we haven't hit the limit for this level
+            if (germsSpawnedThisLevel < GERMS_PER_LEVEL && Math.random() < 0.02) {
+                let movingRight = Math.random() < 0.5;
+                germs.push({
+                    x: movingRight ? -50 : canvas.width + 50,
+                    y: Math.random() * (canvas.height - 100) + 50,
+                    radius: 30 + Math.random() * 20,
+                    // Apply current level speed
+                    speed: baseSpeed * (movingRight ? 1 : -1),
+                    color: Math.random() < 0.5 ? '#00ccff' : '#ccff00'
+                });
+                germsSpawnedThisLevel++;
+            }
+
+            // Move and Render Entities
+            for (let i = germs.length - 1; i >= 0; i--) {
+                let g = germs[i];
+                g.x += g.speed;
+
+                // Draw Body
+                ctx.beginPath();
+                ctx.arc(g.x, g.y, g.radius, 0, Math.PI * 2);
+                ctx.fillStyle = g.color;
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#000';
+                ctx.stroke();
+                
+                // Draw Eyes
+                ctx.fillStyle = 'white';
+                ctx.beginPath(); ctx.arc(g.x - 10, g.y - 5, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(g.x + 10, g.y - 5, 8, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = 'black';
+                ctx.beginPath(); ctx.arc(g.x - 10, g.y - 5, 3, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(g.x + 10, g.y - 5, 3, 0, Math.PI*2); ctx.fill();
+
+                // Clean up germs that drift off-screen
+                if (g.x < -100 || g.x > canvas.width + 100) {
+                    germs.splice(i, 1);
+                }
+            }
+
+            // Level Progression Logic
+            // If all 25 germs have spawned AND the screen is clear of germs
+            if (germsSpawnedThisLevel >= GERMS_PER_LEVEL && germs.length === 0) {
+                // Use 4.95 to account for floating point math inaccuracies 
+                if (baseSpeed < 4.95) {
+                    level++;
+                    baseSpeed += 0.1;
+                    germsSpawnedThisLevel = 0; // Reset for next wave
+                    document.getElementById('levelDisplay').innerText = level;
+                } else {
+                    gameWon = true;
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // Tap / Click Detection
+        canvas.addEventListener('pointerdown', (e) => {
+            if (gameWon) return; // Prevent clicking after game ends
+
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clickX = (e.clientX - rect.left) * scaleX;
+            const clickY = (e.clientY - rect.top) * scaleY;
+
+            for (let i = germs.length - 1; i >= 0; i--) {
+                let g = germs[i];
+                let dist = Math.hypot(clickX - g.x, clickY - g.y);
+                if (dist <= g.radius) {
+                    germs.splice(i, 1);
+                    score++;
+                    document.getElementById('scoreDisplay').innerText = score;
+                    break; 
+                }
+            }
+        });
+
+        // Start Engine
+        update();
+    </script>
+</body>
+</html>
